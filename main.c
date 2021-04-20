@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAXCHARS 1000
 #define MAXMEM 30000
 #define STACK_EMPTY -1
 
@@ -21,7 +20,7 @@ void clear_stack(Stack *s);
 
 unsigned char memory[MAXMEM];
 short ptr = 0;
-char code[MAXCHARS];
+char *code;
 Stack loop_indices = NULL;
 
 int main(int argc, const char *argv[])
@@ -44,10 +43,21 @@ int main(int argc, const char *argv[])
     for (i = 0; i < MAXMEM; ++i)
         memory[i] = 0;
 
+    long allocated = 100;
+    code = (char *)malloc(allocated);
+    if (code == NULL)
+    {
+        printf("Error: Unable to allocate memory.\n");
+        return 0;
+    }
+
     // copying code from file to variable 'code'
     int c;
-    for (i = 0; i < MAXCHARS - 1 && (c = fgetc(fptr)) != EOF;)
+    for (i = 0; (c = fgetc(fptr)) != EOF;)
     {
+        if (i == allocated - 1)
+            code = (char *)realloc(code, allocated += 50);
+
         // only copy the brainfuck operators
         if (c == '+' || c == '-' || c == '>' || c == '<' || c == '.' || c == ',' || c == '[' || c == ']')
         {
@@ -56,6 +66,8 @@ int main(int argc, const char *argv[])
         }
     }
     code[i] = '\0';
+
+    fclose(fptr);
 
     for (i = 0; (c = code[i]) != '\0'; ++i)
     {
@@ -70,8 +82,10 @@ int main(int argc, const char *argv[])
                 printf("Runtime Error: Cell index out of range (>%d)\n", MAXMEM - 1);
                 printf("Pointer is already pointing at the last memory cell.\n");
 
+                free(code);
                 clear_stack(&loop_indices);
-                exit(0);
+
+                return 0;
             }
 
             ++ptr;
@@ -83,8 +97,10 @@ int main(int argc, const char *argv[])
                 printf("Runtime Error: Cell index out of range (<0)\n");
                 printf("Pointer is already pointing at the first memory cell.\n");
 
+                free(code);
                 clear_stack(&loop_indices);
-                exit(0);
+
+                return 0;
             }
 
             --ptr;
@@ -110,8 +126,9 @@ int main(int argc, const char *argv[])
         }
     }
 
+    free(code);
     clear_stack(&loop_indices);
-    fclose(fptr);
+
     return 0;
 }
 
@@ -138,8 +155,9 @@ short pop(Stack *s)
 
     Node *tmp = *s;
     *s = (*s)->next;
-
     free(tmp);
+
+    return value;
 }
 
 void clear_stack(Stack *s)
