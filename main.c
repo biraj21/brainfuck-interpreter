@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAXMEM 30000
+#define MAXMEM 30000 // number of memory cells (1 byte each)
 #define STACK_EMPTY -1
 
 // stack
@@ -18,28 +18,30 @@ bool push(Stack *s, short value);
 short pop(Stack *s);
 void clear_stack(Stack *s);
 
-unsigned char memory[MAXMEM];
-short ptr = 0;
+unsigned char memory[MAXMEM]; // memory cells (1 byte each)
+short ptr = 0;                // currently pointed memory cell
 char *code;
-Stack loop_indices = NULL;
+Stack loop_indices = NULL; // stores indices
+bool skip = false;         // whether to skip the code or not (loop)
 
 int main(int argc, const char *argv[])
 {
     if (argc < 2)
     {
         printf("Usage: bf <file>\n");
-        return 0;
+        return 1;
     }
 
+    // opens the brainfuck file
     FILE *fptr = fopen(argv[1], "r");
     if (fptr == NULL)
     {
-        printf("Fatal error: Unable to open file %s.\n", argv[1]);
-        return 0;
+        printf("Fatal error: Couldn't open file '%s'\n", argv[1]);
+        return 1;
     }
 
-    // initialize each memory cell with 0
     int i;
+    // initializes each memory cell with 0
     for (i = 0; i < MAXMEM; ++i)
         memory[i] = 0;
 
@@ -47,31 +49,61 @@ int main(int argc, const char *argv[])
     code = (char *)malloc(allocated);
     if (code == NULL)
     {
-        printf("Error: Unable to allocate memory.\n");
-        return 0;
+        printf("Error: Unable to allocate memory\n");
+        return 1;
     }
 
-    // copying code from file to variable 'code'
+    // copying code from file to the variable 'code'
     int c;
     for (i = 0; (c = fgetc(fptr)) != EOF;)
     {
-        if (i == allocated - 1)
-            code = (char *)realloc(code, allocated += 50);
-
         // only copy the brainfuck operators
         if (c == '+' || c == '-' || c == '>' || c == '<' || c == '.' || c == ',' || c == '[' || c == ']')
         {
-            code[i] = c;
-            ++i;
+            // allocate more memory for the variable 'code' if required
+            if (i == allocated - 1)
+            {
+                code = (char *)realloc(code, allocated += 50);
+                if (code == NULL)
+                {
+                    printf("Error: Unable to allocate memory\n");
+                    return 1;
+                }
+            }
+
+            code[i++] = c;
         }
     }
     code[i] = '\0';
 
+    // closes the brainfuck file that was opened
     fclose(fptr);
 
+    // interpreter
     for (i = 0; (c = code[i]) != '\0'; ++i)
     {
-        if (c == '+')
+        if (skip && c != ']')
+            continue;
+
+        if (c == ']')
+        {
+            if (skip)
+            {
+                skip = false;
+                continue;
+            }
+            else if (loop_indices == NULL)
+            {
+                printf("Runtime Error: No matching '[' found for current ']'\n");
+                return 0;
+            }
+
+            if (memory[ptr] == 0)
+                pop(&loop_indices);
+            else
+                i = loop_indices->value;
+        }
+        else if (c == '+')
             ++memory[ptr];
         else if (c == '-')
             --memory[ptr];
@@ -80,7 +112,7 @@ int main(int argc, const char *argv[])
             if (ptr == MAXMEM - 1)
             {
                 printf("Runtime Error: Cell index out of range (>%d)\n", MAXMEM - 1);
-                printf("Pointer is already pointing at the last memory cell.\n");
+                printf("Pointer is already pointing at the 'last' memory cell.\n");
 
                 free(code);
                 clear_stack(&loop_indices);
@@ -95,7 +127,7 @@ int main(int argc, const char *argv[])
             if (ptr == 0)
             {
                 printf("Runtime Error: Cell index out of range (<0)\n");
-                printf("Pointer is already pointing at the first memory cell.\n");
+                printf("Pointer is already pointing at the 'first' memory cell.\n");
 
                 free(code);
                 clear_stack(&loop_indices);
@@ -110,24 +142,20 @@ int main(int argc, const char *argv[])
         else if (c == '.')
             putchar(memory[ptr]);
         else if (c == '[')
-            push(&loop_indices, i);
-        else if (c == ']')
         {
-            if (loop_indices == NULL)
-            {
-                printf("Runtime Error: No matching '[' found for current ']'\n");
-                exit(0);
-            }
-
             if (memory[ptr] == 0)
-                pop(&loop_indices);
+                skip = true;
             else
-                i = loop_indices->value;
+                push(&loop_indices, i);
         }
     }
 
     free(code);
-    clear_stack(&loop_indices);
+    if (loop_indices != NULL)
+    {
+        printf("Runtime Error: Missing ']'\n");
+        clear_stack(&loop_indices);
+    }
 
     return 0;
 }
