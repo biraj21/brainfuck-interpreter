@@ -21,9 +21,9 @@ void clear_stack(Stack *s);
 unsigned char memory[MAXMEM]; // memory cells (1 byte each)
 short ptr = 0;                // currently pointed memory cell
 char *code;
-Stack loop_indices = NULL; // stores indices
-int opened = 0;            // number of '[' (opened loops)
+Stack loop_indices = NULL; // stores indices of '[' (opening of a loop)
 bool skip = false;         // whether to skip the code or not (loop)
+int opened = 0;            // number of '[' (opened loops) while skipping
 
 int main(int argc, const char *argv[])
 {
@@ -86,44 +86,19 @@ int main(int argc, const char *argv[])
         if (skip)
         {
             if (c == '[')
-            {
                 ++opened;
-                continue;
-            }
             else if (c == ']')
             {
-                if (opened-- > 0)
-                    continue;
+                if (opened > 0)
+                    --opened;
                 else
-                    opened = 0;
-            }
-            else
-                continue;
-        }
-
-        if (c == ']')
-        {
-            if (skip)
-            {
-                skip = false;
-                continue;
-            }
-            else if (loop_indices == NULL)
-            {
-                printf("Runtime Error: No matching '[' found for current ']'\n");
-                return 0;
+                    skip = false;
             }
 
-            if (memory[ptr] == 0)
-                pop(&loop_indices);
-            else
-                i = loop_indices->value;
+            continue;
         }
-        else if (c == '+')
-            ++memory[ptr];
-        else if (c == '-')
-            --memory[ptr];
-        else if (c == '>')
+
+        if (c == '>')
         {
             if (ptr == MAXMEM - 1)
             {
@@ -153,6 +128,10 @@ int main(int argc, const char *argv[])
 
             --ptr;
         }
+        else if (c == '+')
+            ++memory[ptr];
+        else if (c == '-')
+            --memory[ptr];
         else if (c == ',')
             memory[ptr] = getchar();
         else if (c == '.')
@@ -164,12 +143,25 @@ int main(int argc, const char *argv[])
             else
                 push(&loop_indices, i);
         }
+        else if (c == ']')
+        {
+            if (loop_indices == NULL)
+            {
+                printf("Runtime Error: No matching '[' found for current ']'\n");
+                return 0;
+            }
+
+            if (memory[ptr] == 0)
+                pop(&loop_indices);
+            else
+                i = loop_indices->value;
+        }
     }
 
     free(code);
     if (loop_indices != NULL)
     {
-        printf("Runtime Error: Missing ']'\n");
+        printf("Warning: Missing ']'\n");
         clear_stack(&loop_indices);
     }
 
