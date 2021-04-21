@@ -22,6 +22,7 @@ unsigned char memory[MAXMEM]; // memory cells (1 byte each)
 short ptr = 0;                // currently pointed memory cell
 char *code;
 Stack loop_indices = NULL; // stores indices
+int opened = 0;            // number of '[' (opened loops)
 bool skip = false;         // whether to skip the code or not (loop)
 
 int main(int argc, const char *argv[])
@@ -82,8 +83,23 @@ int main(int argc, const char *argv[])
     // interpreter
     for (i = 0; (c = code[i]) != '\0'; ++i)
     {
-        if (skip && c != ']')
-            continue;
+        if (skip)
+        {
+            if (c == '[')
+            {
+                ++opened;
+                continue;
+            }
+            else if (c == ']')
+            {
+                if (opened-- > 0)
+                    continue;
+                else
+                    opened = 0;
+            }
+            else
+                continue;
+        }
 
         if (c == ']')
         {
