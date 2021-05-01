@@ -1,29 +1,16 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../include/stack.h"
 
-#define MAXMEM 30000 // number of memory cells (1 byte each)
-#define STACK_EMPTY -1
-
-// stack
-typedef struct Node
-{
-    short value;
-    struct Node *next;
-} Node;
-
-typedef Node *Stack;
-
-bool push(Stack *s, short value);
-short pop(Stack *s);
-void clear_stack(Stack *s);
+#define MAXMEM 30000 // number of memory cells
 
 unsigned char memory[MAXMEM]; // memory cells (1 byte each)
-short ptr = 0;                // currently pointed memory cell
-char *code;
-Stack loop_indices = NULL; // stores indices of '[' (opening of a loop)
-bool skip = false;         // whether to skip the code or not (loop)
-int opened = 0;            // number of '[' (opened loops) while skipping
+unsigned short ptr = 0;       // currently pointed memory cell
+char *code;                   // brainfuck code
+Stack loop_indices = NULL;    // stores the indices of '[' (opened loops)
+bool skip = false;            // whether to skip the code or not (loop)
+unsigned short opened = 0;    // number of '[' while skipping
 
 int main(int argc, const char *argv[])
 {
@@ -33,7 +20,7 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    // opens the brainfuck file
+    // opening brainfuck file
     FILE *fptr = fopen(argv[1], "r");
     if (fptr == NULL)
     {
@@ -42,7 +29,7 @@ int main(int argc, const char *argv[])
     }
 
     int i;
-    // initializes each memory cell with 0
+    // initializing each memory cell with 0
     for (i = 0; i < MAXMEM; ++i)
         memory[i] = 0;
 
@@ -54,14 +41,14 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    // copying code from file to the variable 'code'
+    // copying brainfuck code from the file to variable 'code'
     int c;
     for (i = 0; (c = fgetc(fptr)) != EOF;)
     {
-        // only copy the brainfuck operators
-        if (c == '+' || c == '-' || c == '>' || c == '<' || c == '.' || c == ',' || c == '[' || c == ']')
+        // copying only brainfuck operators
+        if (c == '>' || c == '<' || c == '+' || c == '-' || c == ',' || c == '.' || c == '[' || c == ']')
         {
-            // allocate more memory for the variable 'code' if required
+            // allocate more memory to variable 'code' if needed
             if (i == allocated - 1)
             {
                 code = (char *)realloc(code, allocated += 50);
@@ -77,7 +64,7 @@ int main(int argc, const char *argv[])
     }
     code[i] = '\0';
 
-    // closes the brainfuck file that was opened
+    // closing the open brainfuck file
     fclose(fptr);
 
     // interpreter
@@ -103,7 +90,7 @@ int main(int argc, const char *argv[])
             if (ptr == MAXMEM - 1)
             {
                 printf("Runtime Error: Cell index out of range (>%d)\n", MAXMEM - 1);
-                printf("Pointer is already pointing at the 'last' memory cell.\n");
+                printf("Pointer is already at the last memory cell.\n");
 
                 free(code);
                 clear_stack(&loop_indices);
@@ -118,7 +105,7 @@ int main(int argc, const char *argv[])
             if (ptr == 0)
             {
                 printf("Runtime Error: Cell index out of range (<0)\n");
-                printf("Pointer is already pointing at the 'first' memory cell.\n");
+                printf("Pointer is already at the first memory cell.\n");
 
                 free(code);
                 clear_stack(&loop_indices);
@@ -159,6 +146,7 @@ int main(int argc, const char *argv[])
     }
 
     free(code);
+
     if (loop_indices != NULL)
     {
         printf("Warning: Missing ']'\n");
@@ -166,38 +154,4 @@ int main(int argc, const char *argv[])
     }
 
     return 0;
-}
-
-// functions for stack
-bool push(Stack *s, short value)
-{
-    Node *new_node = malloc(sizeof(Node));
-    if (new_node == NULL)
-        return false;
-
-    new_node->value = value;
-    new_node->next = *s;
-
-    *s = new_node;
-    return true;
-}
-
-short pop(Stack *s)
-{
-    if (*s == NULL)
-        return STACK_EMPTY;
-
-    short value = (*s)->value;
-
-    Node *tmp = *s;
-    *s = (*s)->next;
-    free(tmp);
-
-    return value;
-}
-
-void clear_stack(Stack *s)
-{
-    while (pop(s) != STACK_EMPTY)
-        ;
 }

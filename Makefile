@@ -1,5 +1,7 @@
+path = ./src
+flags = -Wall -Werror
 build:
-	gcc main.c -o bf -Wall -Werror
+	gcc $(flags) $(path)/main.c $(path)/stack.c -o bf
 
 clean:
 	rm -fr bf
