@@ -2,7 +2,7 @@
 
 Build:
 ```
-make build
+make bf
 ```
 
 Usage:
