@@ -1,18 +1,17 @@
-#include <stdbool.h>
 #include <stdlib.h>
 #include "../include/stack.h"
 
-bool push(Stack *head, unsigned short value)
+int push(Stack *head, unsigned short value)
 {
     Stack new_node = malloc(sizeof(Node));
     if (new_node == NULL)
-        return false;
+        return -1;
 
     new_node->value = value;
     new_node->next = *head;
     *head = new_node;
 
-    return true;
+    return 0;
 }
 
 short pop(Stack *head)
@@ -27,10 +26,4 @@ short pop(Stack *head)
     free(tmp);
 
     return value;
-}
-
-void clear_stack(Stack *head)
-{
-    while (pop(head) != STACK_EMPTY)
-        ;
 }

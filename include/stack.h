@@ -3,16 +3,15 @@
 
 #define STACK_EMPTY -1
 
-typedef struct Node
+typedef struct _Node
 {
     unsigned short value;
-    struct Node *next;
+    struct _Node *next;
 } Node;
 
 typedef Node *Stack;
 
-bool push(Stack *head, unsigned short value);
+int push(Stack *head, unsigned short value);
 short pop(Stack *head);
-void clear_stack(Stack *head);
 
 #endif

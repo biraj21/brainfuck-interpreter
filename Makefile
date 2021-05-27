@@ -1,7 +1,10 @@
-path = ./src
-flags = -Wall -Werror
-build:
-	gcc $(flags) $(path)/main.c $(path)/stack.c -o bf
+CC = gcc
+SRC = ./src
+FLAGS = -Wall -Werror
+BIN = bf
+
+$(BIN): $(SRC)/main.c $(SRC)/stack.c
+	$(CC) $(FLAGS) -o $@ $^
 
 clean:
-	rm -fr bf
+	rm -f $(BIN)
