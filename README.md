@@ -7,5 +7,5 @@ make bf
 
 Usage:
 ```
-bf <file>
+bf FILE
 ```
