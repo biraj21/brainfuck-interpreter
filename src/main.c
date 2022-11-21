@@ -124,8 +124,8 @@ void interpret(void) {
                 stack_push(&jumps, i + 1);
             }
         } else if (c == ']' ) {
-            if (jumps.top == NULL) {
-                fputs("bf: Runtime Error: Unnecessary ']'. No matching '[' found for current ']'\n", stderr);
+            if (stack_is_empty(&jumps)) {
+                fputs("bf: Runtime Error: Unnecessary ']'. Opening '[' not found for current ']'\n", stderr);
                 exit(EXIT_FAILURE);
             }
 
