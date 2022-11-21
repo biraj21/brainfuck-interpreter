@@ -1,129 +1,182 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "stack.h"
+#include "transpiler.h"
 
 #define MAXMEM 30000 // number of memory cells
 
-void free_memory(void);
+typedef enum {
+    INTERPRET,
+    TRANSPILE
+} Action;
 
-unsigned char memory[MAXMEM]; // memory cells (1 byte each)
-unsigned short ptr = 0;       // currently pointed memory cell
-char *code = NULL;            // for storing brainfuck code
-Stack jumps = STACK_INIT;     // stores indices of '[' (opened loops)
+void free_memory(void);
+void interpret(void);
+void read_from_file(FILE *fp, char **str, size_t *capacity_ptr);
+
+unsigned char memory[MAXMEM] = {0}; // memory cells (1 byte each)
+unsigned short ptr = 0;             // currently pointed memory cell
+char *code = NULL;                  // for storing brainfuck code
+Stack jumps = STACK_INIT;           // stores indices of '[' (opened loops)
 
 int main(int argc, const char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s FILE\n", argv[0]);
-        return 1;
+    Action action = INTERPRET;
+    FILE *fp =  NULL;
+    if (argc > 1) {
+        if (strcmp(argv[1], "--transpile") == 0) {
+            action = TRANSPILE;
+        } else if (strncmp(argv[1], "--", 2) == 0) {
+            fprintf(stderr, "bf: Error: Invalid option %s\n", argv[1]);
+            return EXIT_FAILURE;
+        }
+
+        bool file_given = false;
+        if (action == TRANSPILE && argc > 2) {
+            fp = fopen(argv[2], "r");
+            file_given = true;
+        } else if (action == INTERPRET && argc > 1) {
+            fp = fopen(argv[1], "r");
+            file_given = true;
+        }
+
+        if (file_given && fp == NULL) {
+            perror("bf: Fatal Error");
+            return EXIT_FAILURE;
+        }
     }
 
-    FILE *fp = fopen(argv[1], "r");
-    if (fp == NULL) {
-        perror("bf: Fatal Error");
-        return 1;
-    }
-
-    size_t alloced = 128;
-    code = malloc(alloced);
+    size_t capacity = 128;
+    code = malloc(capacity);
     if (code == NULL) {
         fclose(fp);
         perror("bf: Error");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     atexit(free_memory);
 
-    int len = 0;
-    for (int c; (c = fgetc(fp)) != EOF;) {
-        if (c == '>' || c == '<' || c == '+' || c == '-' || c == '[' || c == ']' || c == ',' || c == '.') {
-             code[len] = c;
-
-            if (++len == alloced - 1) {
-                alloced *= 1.5;
-                char *new_buf = realloc(code, alloced);
-                if (new_buf == NULL) {
-                    fclose(fp);
-                    perror("bf: Error");
-                    return 1;
-                }
-
-                code = new_buf;
-            }
-        }
+    if (fp != NULL) {
+        read_from_file(fp, &code, &capacity);
+        fclose(fp);
+    } else {
+        read_from_file(stdin, &code, &capacity);
+        puts("\n----- read -----");
+        freopen("/dev/tty", "r", stdin); // reopening stdin in case the Brainfuck program needs user input
     }
 
-    code[len] = '\0';
-    fclose(fp);
+    if (action == TRANSPILE) {
+        transpile(code, stdout);
+    } else {
+        interpret();
+    }
 
-    // initializing each memory cell with 0
-    for (int i = 0; i < MAXMEM; ++i)
-        memory[i] = 0;
+    return EXIT_SUCCESS;
+}
 
-    /*** Interpreter ***/
-    for (int i = 0; code[i]!= '\0';) {
+void free_memory(void) {
+    free(code);
+    while (!stack_is_empty(&jumps)) {
+        stack_pop(&jumps);
+    }
+}
+
+void interpret(void) {
+    for (size_t i = 0; code[i]!= '\0';) {
         char c = code[i];
         if (c == '>') {
             if (ptr == MAXMEM - 1) {
-                fprintf(stderr, "bf: Runtime Error: Cell index out of range\n"
-                                "Pointer is already at the last memory cell (index %d).\n", MAXMEM - 1);
-                return 1;
+                fprintf(stderr, "bf: Runtime Error: Cell index out of range. Pointer is already at the last memory cell (index %d).\n", MAXMEM - 1);
+                exit(EXIT_FAILURE);
             }
 
             ++ptr;
         } else if (c == '<') {
             if (ptr == 0) {
-                fputs("bf: Runtime Error: Cell index out of range\n"
-                     "Pointer is already at the first memory cell (index 0).\n", stderr);
-                return 1;
+                fputs("bf: Runtime Error: Cell index out of range. Pointer is already at the first memory cell (index 0).\n", stderr);
+                exit(EXIT_FAILURE);
             }
 
             --ptr;
-        } else if (c == '+')
+        } else if (c == '+') {
             ++memory[ptr];
-        else if (c == '-')
+        } else if (c == '-') {
             --memory[ptr];
-        else if (c == '[') {
+        } else if (c == '[') {
             if (memory[ptr] == 0) {
                 ++i;
-                for (int loop_depth = 1; loop_depth > 0 && code[i] != '\0'; ++i) {
-                    if (code[i] == '[')
+                int loop_depth = 1; 
+                for (; loop_depth > 0 && code[i] != '\0'; ++i) {
+                    if (code[i] == '[') {
                         ++loop_depth;
-                    else if (code[i] == ']')
+                    } else if (code[i] == ']') {
                         --loop_depth;
+                    }
+                }
+
+                if (loop_depth > 0) {
+                    puts("bf: Warning: Unclosed loop. Missing a ']'.");
                 }
 
                 continue;
-            } else
-                push(&jumps, i + 1);
+            } else {
+                stack_push(&jumps, i + 1);
+            }
         } else if (c == ']' ) {
             if (jumps.top == NULL) {
-                fputs("bf: Runtime Error: Unnecessary ']' for unopened loop\n"
-                      "No matching '[' found for current ']'\n", stderr);
-                return 1;
+                fputs("bf: Runtime Error: Unnecessary ']'. No matching '[' found for current ']'\n", stderr);
+                exit(EXIT_FAILURE);
             }
 
-            if (memory[ptr] == 0)
-                pop(&jumps);
-            else {
+            if (memory[ptr] == 0) {
+                stack_pop(&jumps);
+            } else {
                 i = jumps.top->value;
                 continue;
             }
-        } else if (c == ',')
+        } else if (c == ',') {
             memory[ptr] = getchar();
-        else if (c == '.')
+        } else if (c == '.') {
             putchar(memory[ptr]);
+        }
 
         ++i;
     }
 
-    if (jumps.top != NULL)
-        puts("bf: Warning: Unclosed loop\nMissing a ']'.");
-
-    return 0;
+    if (!stack_is_empty(&jumps)) {
+        puts("bf: Warning: Unclosed loop. Missing a ']'.");
+    }
 }
 
-void free_memory(void) {
-    free(code);
-    while (pop(&jumps) != STACK_EMPTY)
-        ;
+void read_from_file(FILE *fp, char **str_ptr, size_t *capacity_ptr) {
+    char *str = *str_ptr;
+    size_t capacity = *capacity_ptr;
+
+    size_t len = 0;
+    int c;
+    while ((c = fgetc(fp)) != EOF) {
+        if (c == '>' || c == '<' || c == '+' || c == '-' || c == '[' || c == ']' || c == ',' || c == '.') {
+            str[len] = c;
+
+            if (++len == capacity - 1) {
+                capacity *= 1.5;
+                char *new_buf = realloc(str, capacity);
+                if (new_buf == NULL) {
+                    if (fp != stdin) {
+                        fclose(fp);
+                    }
+
+                    perror("bf: Error");
+                    exit(EXIT_FAILURE);
+                }
+
+                str = new_buf;
+            }
+        }
+    }
+
+    str[len] = '\0';
+    *str_ptr = str;
+    *capacity_ptr = capacity;
 }

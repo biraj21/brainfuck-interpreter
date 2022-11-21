@@ -1,0 +1,5 @@
+/.vscode
+/bf
+/obj
+/transpiled*
+/valgrind.log

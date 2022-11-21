@@ -1,16 +1,22 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "stack.h"
 
-int push(Stack *self, unsigned short value) {
+bool stack_is_empty(Stack *self) {
+    return self->top == NULL;
+}
+
+int stack_push(Stack *self, unsigned short value) {
     if (self == NULL) {
-        fputs("push(): 'self' cannot be NULL\n", stderr);
-        exit(1);
+        fputs("stack_push(): argument 'self' cannot be NULL\n", stderr);
+        exit(EXIT_FAILURE);
     }
 
     Node *new_node = malloc(sizeof(Node));
-    if (new_node == NULL)
+    if (new_node == NULL) {
         return -1;
+    }
 
     new_node->value = value;
     new_node->next = self->top;
@@ -18,14 +24,16 @@ int push(Stack *self, unsigned short value) {
     return 0;
 }
 
-short pop(Stack *self) {
+unsigned short stack_pop(Stack *self) {
     if (self == NULL) {
-        fputs("pop(): 'self' cannot be NULL\n", stderr);
-        exit(1);
+        fputs("stack_pop(): argument 'self' cannot be NULL\n", stderr);
+        exit(EXIT_FAILURE);
     }
 
-    if (self->top == NULL)
-        return STACK_EMPTY;
+    if (stack_is_empty(self)) {
+        fputs("stack_pop(): stack is empty\n", stderr);
+        exit(EXIT_FAILURE);
+    }
 
     unsigned short value = self->top->value;
     Node *tmp = self->top;
