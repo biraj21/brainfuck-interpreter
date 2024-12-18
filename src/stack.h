@@ -3,15 +3,15 @@
 
 #include <stdbool.h>
 
-#define STACK_INIT { .top = NULL }
+#define STACK_INIT {.top = NULL}
 
 typedef struct _Node {
-    unsigned short value;
-    struct _Node *next;
+  unsigned short value;
+  struct _Node *next;
 } Node;
 
 typedef struct {
-    Node *top;
+  Node *top;
 } Stack;
 
 bool stack_is_empty(Stack *self);

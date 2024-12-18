@@ -95,24 +95,25 @@ void interpret(struct Instruction *code) {
   for (size_t i = 0; code[i].type != END;) {
     struct Instruction inst = code[i];
     if (inst.type == INC_PTR) {
-      if (ptr == MAXMEM - 1) {
-        fprintf(stderr,
-                "bf: Runtime Error: Cell index out of range. Pointer is "
-                "already at the last memory cell (index %d).\n",
-                MAXMEM - 1);
-        exit(EXIT_FAILURE);
-      }
-
       ptr += inst.count;
-    } else if (inst.type == DEC_PTR) {
-      if (ptr == 0) {
-        fputs("bf: Runtime Error: Cell index out of range. Pointer is already "
-              "at the first memory cell (index 0).\n",
-              stderr);
+
+      if (ptr >= MAXMEM) {
+        fprintf(stderr,
+                "bf: Runtime Error: Cell index out of range. Pointer has "
+                "exceeded the MAXIMUM memory cell index (%d).\n",
+                ptr);
         exit(EXIT_FAILURE);
       }
-
+    } else if (inst.type == DEC_PTR) {
       ptr -= inst.count;
+
+      if (ptr < 0) {
+        fprintf(stderr,
+                "bf: Runtime Error: Cell index out of range. Pointer has "
+                "exceeded the MINIMUM memory cell index (%d).\n",
+                ptr);
+        exit(EXIT_FAILURE);
+      }
     } else if (inst.type == INC) {
       memory[ptr] += inst.count;
     } else if (inst.type == DEC) {
@@ -185,7 +186,7 @@ struct Instruction *parse_file(FILE *fp) {
     exit(EXIT_FAILURE);
   }
 
-  size_t index = 0;
+  size_t i = 0;
   while (true) {
     int c = fgetc(fp);
     if (c == EOF) {
@@ -197,19 +198,17 @@ struct Instruction *parse_file(FILE *fp) {
       continue;
     }
 
-    if (is_groupable(c) && index > 0 &&
-        instructions[index - 1].type == (enum InstructionType)c) {
-      // printf("%c is groupable\n", c);
-      instructions[index - 1].count++;
+    if (is_groupable(c) && i > 0 && instructions[i - 1].type == c) {
+      instructions[i - 1].count++;
       continue;
     }
 
     // add new instruction
-    instructions[index].type = c;
-    instructions[index].count = 1;
+    instructions[i].type = c;
+    instructions[i].count = 1;
 
-    ++index;
-    if (index == capacity - 1) {
+    ++i;
+    if (i == capacity - 1) {
       capacity *= 2;
       struct Instruction *new_buf =
           realloc(instructions, sizeof(struct Instruction) * capacity);
@@ -227,11 +226,11 @@ struct Instruction *parse_file(FILE *fp) {
     }
   }
 
-  instructions[index].type = END;
+  instructions[i].type = END;
   return instructions;
 }
 
-static void add_identation(unsigned int indent_level, FILE *fp) {
+static void add_indentation(unsigned int indent_level, FILE *fp) {
   for (unsigned int i = 0; i < indent_level; ++i) {
     fputs("    ", fp);
   }
@@ -251,34 +250,30 @@ void transpile(struct Instruction *code, FILE *output_fp) {
   for (size_t i = 0; code[i].type != '\0';) {
     struct Instruction inst = code[i];
     if (inst.type == INC_PTR) {
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fprintf(output_fp, "ptr += %zu;\n", inst.count);
-
     } else if (inst.type == DEC_PTR) {
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fprintf(output_fp, "ptr -= %zu;\n", inst.count);
-
     } else if (inst.type == INC) {
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fprintf(output_fp, "*ptr += %zu;\n", inst.count);
-
     } else if (inst.type == DEC) {
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fprintf(output_fp, "*ptr -= %zu;\n", inst.count);
-
     } else if (inst.type == LOOP_START) {
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fputs("while (*ptr) {\n", output_fp);
       ++indent_level;
     } else if (inst.type == LOOP_END) {
       --indent_level;
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fputs("}\n", output_fp);
     } else if (inst.type == READ) {
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fputs("*ptr = getchar();\n", output_fp);
     } else if (inst.type == WRITE) {
-      add_identation(indent_level, output_fp);
+      add_indentation(indent_level, output_fp);
       fputs("putchar(*ptr);\n", output_fp);
     }
 
