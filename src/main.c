@@ -17,7 +17,7 @@ enum InstructionType {
   LOOP_END = ']',
 
   // to mark end of program
-  END = '\0',
+  END = -1,
 };
 
 struct Instruction {
